@@ -42,9 +42,12 @@ public class MainActivity extends AppCompatActivity {
     private BarChart barChartSemanal;
     private LineChart lineChartMensual;
 
+
     private StepCounter stepCounter;
     private SharedPreferencesManager prefsManager;
 // private DatabaseHelper dbHelper; // Si usas base de datos
+
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -78,7 +81,16 @@ public class MainActivity extends AppCompatActivity {
         mostrarGraficoMensual();
         actualizarObjetivoUI();
     }
-
+    protected void onStepDetected(long steps) {
+        // Asegúrate de que la actualización de la UI se haga en el hilo principal
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                pasosTextView.setText("Pasos: " + steps);
+                // También podrías actualizar la barra de progreso aquí si tienes una
+            }
+        });
+    }
     private void actualizarPasosUI(long pasos) {
         pasosTextView.setText("Pasos: " + pasos);
         // Aquí podrías guardar los pasos diarios usando prefsManager o dbHelper
@@ -174,10 +186,30 @@ public class MainActivity extends AppCompatActivity {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == PERMISSION_REQUEST_ACTIVITY_RECOGNITION) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                stepCounter.startListening();
+                // Permiso concedido
+                Log.d("Permissions", "Permiso ACTIVITY_RECOGNITION concedido.");
+                if (stepCounter != null && stepCounter.isStepCounterAvailable()) {
+                    stepCounter.startListening();
+                }
+                // Actualizar UI o habilitar funcionalidad de conteo de pasos
+                // Por ejemplo, si tenías un mensaje de "permiso necesario", ocúltalo.
             } else {
-                Toast.makeText(this, "Permiso de reconocimiento de actividad denegado", Toast.LENGTH_SHORT).show();
-            }
+                // Permiso denegado
+                Log.d("Permissions", "Permiso ACTIVITY_RECOGNITION denegado.");
+                // Explicar por qué el permiso es necesario y cómo pueden habilitarlo manualmente
+                //if (!ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.ACTIVITY_RECOGNITION)) {
+                    // El usuario marcó "No volver a preguntar" O la política del dispositivo lo prohíbe.
+                    // Mostrar un diálogo que los dirija a la configuración de la app.
+                   // mostrarDialogoPermisoDenegadoYNoVolverAPreguntar();
+                //} else {
+                    // El usuario denegó, pero no marcó "No volver a preguntar".
+                    // Puedes mostrar un diálogo explicando la necesidad del permiso la próxima vez
+                    // que intenten usar la funcionalidad o en onResume.
+                  //  mostrarDialogoExplicativoPermisoNecesario();
+                }
+                // Actualizar UI para reflejar que la funcionalidad no está disponible
+                pasosTextView.setText("Conteo de pasos deshabilitado. Se requiere permiso.");
+            //}
         }
     }
 
