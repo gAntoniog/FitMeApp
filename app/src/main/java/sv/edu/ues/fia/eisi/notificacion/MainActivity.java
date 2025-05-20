@@ -36,6 +36,7 @@ import java.util.List;
 public class MainActivity extends AppCompatActivity {
 
     private static final int PERMISSION_REQUEST_ACTIVITY_RECOGNITION = 101;
+    private static final int REQUEST_CODE_POST_NOTIFICATIONS = 102;
     private TextView pasosTextView;
     private Button objetivoButton;
     private Button notificacionButton;
@@ -73,6 +74,14 @@ public class MainActivity extends AppCompatActivity {
         } else {
             stepCounter.startListening();
         }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) !=
+                    PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this,
+                        new String[]{Manifest.permission.POST_NOTIFICATIONS},
+                        REQUEST_CODE_POST_NOTIFICATIONS); // Define esta constante
+            }
+        }
 
         objetivoButton.setOnClickListener(v -> mostrarDialogoObjetivo());
         notificacionButton.setOnClickListener(v -> enviarNotificacionBasica());
@@ -88,11 +97,24 @@ public class MainActivity extends AppCompatActivity {
             public void run() {
                 pasosTextView.setText("Pasos: " + steps);
                 // También podrías actualizar la barra de progreso aquí si tienes una
+                int objetivo = prefsManager.obtenerObjetivoPasos();
+                // Comprueba si se alcanzó el objetivo y si la notificación para hoy aún no se ha enviado
+                if (steps >= objetivo && !prefsManager.haNotificadoObjetivoHoy()) {
+                    enviarNotificacionObjetivoAlcanzado(steps, objetivo);
+                    prefsManager.marcarNotificacionObjetivoEnviadaHoy(true); // Marcar que la notificación se envió
+                }
             }
         });
     }
     private void actualizarPasosUI(long pasos) {
         pasosTextView.setText("Pasos: " + pasos);
+        int objetivo = prefsManager.obtenerObjetivoPasos();
+        // Comprueba si se alcanzó el objetivo y si la notificación para hoy aún no se ha enviado
+        if (pasos >= objetivo && !prefsManager.haNotificadoObjetivoHoy()) {
+            enviarNotificacionObjetivoAlcanzado(pasos, objetivo);
+            prefsManager.marcarNotificacionObjetivoEnviadaHoy(true); // Marcar que la notificación se envió
+        }
+
         // Aquí podrías guardar los pasos diarios usando prefsManager o dbHelper
     }
 
@@ -192,24 +214,15 @@ public class MainActivity extends AppCompatActivity {
                     stepCounter.startListening();
                 }
                 // Actualizar UI o habilitar funcionalidad de conteo de pasos
-                // Por ejemplo, si tenías un mensaje de "permiso necesario", ocúltalo.
+
             } else {
                 // Permiso denegado
                 Log.d("Permissions", "Permiso ACTIVITY_RECOGNITION denegado.");
                 // Explicar por qué el permiso es necesario y cómo pueden habilitarlo manualmente
-                //if (!ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.ACTIVITY_RECOGNITION)) {
-                    // El usuario marcó "No volver a preguntar" O la política del dispositivo lo prohíbe.
-                    // Mostrar un diálogo que los dirija a la configuración de la app.
-                   // mostrarDialogoPermisoDenegadoYNoVolverAPreguntar();
-                //} else {
-                    // El usuario denegó, pero no marcó "No volver a preguntar".
-                    // Puedes mostrar un diálogo explicando la necesidad del permiso la próxima vez
-                    // que intenten usar la funcionalidad o en onResume.
-                  //  mostrarDialogoExplicativoPermisoNecesario();
-                }
+
                 // Actualizar UI para reflejar que la funcionalidad no está disponible
                 pasosTextView.setText("Conteo de pasos deshabilitado. Se requiere permiso.");
-            //}
+            }
         }
     }
 
@@ -242,6 +255,18 @@ public class MainActivity extends AppCompatActivity {
 
     private void enviarNotificacionBasica() {
         crearCanalNotificacion();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) !=
+                    PackageManager.PERMISSION_GRANTED) {
+                // Solicitar el permiso. La notificación no se enviará esta vez,
+                // pero se podrá enviar la próxima si el usuario concede el permiso.
+                ActivityCompat.requestPermissions(this,
+                        new String[]{Manifest.permission.POST_NOTIFICATIONS},
+                        REQUEST_CODE_POST_NOTIFICATIONS);
+                Toast.makeText(this, "Se necesita permiso para mostrar notificaciones.", Toast.LENGTH_LONG).show();
+                return; // Salir para no intentar enviar la notificación sin permiso
+            }
+        }
         Intent resultadoIntent = new Intent(this, MainActivity.class);
         androidx.core.app.TaskStackBuilder stackBuilder = androidx.core.app.TaskStackBuilder.create(this);
         stackBuilder.addParentStack(MainActivity.class);
@@ -261,6 +286,35 @@ public class MainActivity extends AppCompatActivity {
 
         android.app.NotificationManager notificationManager = (android.app.NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         notificationManager.notify(1, builder.build());
+    }
+    private void enviarNotificacionObjetivoAlcanzado(long pasosAlcanzados, int objetivo) {
+        crearCanalNotificacion(); // Asegúrate de que el canal esté creado
+
+        Intent resultadoIntent = new Intent(this, MainActivity.class);
+        // Flags para asegurar que la actividad se abra correctamente
+        resultadoIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+
+        androidx.core.app.TaskStackBuilder stackBuilder = androidx.core.app.TaskStackBuilder.create(this);
+        stackBuilder.addParentStack(MainActivity.class);
+        stackBuilder.addNextIntent(resultadoIntent);
+        android.app.PendingIntent resultadoPendingIntent = stackBuilder.getPendingIntent(
+                (int) System.currentTimeMillis(), // Usar un requestCode único para evitar problemas con PendingIntents
+                android.app.PendingIntent.FLAG_UPDATE_CURRENT | android.app.PendingIntent.FLAG_IMMUTABLE
+        );
+
+        String mensaje = "¡Felicidades! Alcanzaste tu objetivo de " + objetivo + " pasos. Llevas " + pasosAlcanzados + " pasos.";
+
+        androidx.core.app.NotificationCompat.Builder builder = new androidx.core.app.NotificationCompat.Builder(this, getPackageName())
+                .setSmallIcon(R.drawable.ic_notification) // Asegúrate de tener este icono
+                .setContentTitle("¡Objetivo de Pasos Alcanzado!")
+                .setContentText(mensaje)
+                .setPriority(androidx.core.app.NotificationCompat.PRIORITY_HIGH) // Prioridad alta para notificaciones importantes
+                .setContentIntent(resultadoPendingIntent)
+                .setAutoCancel(true); // La notificación se cierra al tocarla
+
+        android.app.NotificationManager notificationManager = (android.app.NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        // Usar un ID de notificación diferente para no sobrescribir otras notificaciones si es necesario
+        notificationManager.notify(2, builder.build()); // ID 2 para esta notificación específica
     }
 
 }
