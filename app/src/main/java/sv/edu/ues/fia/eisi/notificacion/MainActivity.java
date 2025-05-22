@@ -1,6 +1,7 @@
 package sv.edu.ues.fia.eisi.notificacion;
 
 import android.Manifest;
+import android.app.NotificationManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -90,17 +91,17 @@ public class MainActivity extends AppCompatActivity {
         mostrarGraficoMensual();
         actualizarObjetivoUI();
     }
-    protected void onStepDetected(long steps) {
-        // Asegúrate de que la actualización de la UI se haga en el hilo principal
+    protected void onStepDetected(long pasos) {
+
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                pasosTextView.setText("Pasos: " + steps);
+                pasosTextView.setText("Pasos: " + pasos);
                 // También podrías actualizar la barra de progreso aquí si tienes una
                 int objetivo = prefsManager.obtenerObjetivoPasos();
                 // Comprueba si se alcanzó el objetivo y si la notificación para hoy aún no se ha enviado
-                if (steps >= objetivo && !prefsManager.haNotificadoObjetivoHoy()) {
-                    enviarNotificacionObjetivoAlcanzado(steps, objetivo);
+                if (pasos >= objetivo && !prefsManager.haNotificadoObjetivoHoy()) {
+                    enviarNotificacionObjetivoAlcanzado(pasos, objetivo);
                     prefsManager.marcarNotificacionObjetivoEnviadaHoy(true); // Marcar que la notificación se envió
                 }
             }
@@ -203,6 +204,7 @@ public class MainActivity extends AppCompatActivity {
         lineChartMensual.invalidate();
     }
 
+    //Manejo de permisos de actividad fisica para conteo de pasos
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
@@ -245,14 +247,14 @@ public class MainActivity extends AppCompatActivity {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             CharSequence nombre = "Pasos Diarios";
             String descripcion = "Notificaciones sobre tu progreso de pasos diarios";
-            int importancia = android.app.NotificationManager.IMPORTANCE_DEFAULT;
+            int importancia = NotificationManager.IMPORTANCE_HIGH;
             android.app.NotificationChannel canal = new android.app.NotificationChannel(getPackageName(), nombre, importancia);
             canal.setDescription(descripcion);
             android.app.NotificationManager notificationManager = getSystemService(android.app.NotificationManager.class);
             notificationManager.createNotificationChannel(canal);
         }
     }
-
+    //Envio de notificacion y manejo de solicitud de permiso para enviar notificaciones
     private void enviarNotificacionBasica() {
         crearCanalNotificacion();
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -277,9 +279,9 @@ public class MainActivity extends AppCompatActivity {
         );
 
         androidx.core.app.NotificationCompat.Builder builder = new androidx.core.app.NotificationCompat.Builder(this, getPackageName())
-                .setSmallIcon(R.drawable.ic_notification) // Asegúrate de tener este icono
+                .setSmallIcon(R.drawable.ic_notification) //icono de notificacion
                 .setContentTitle("¡Progreso de Pasos!")
-                .setContentText("Llevas"+pasosTextView.getText()+" pasos hoy.") // Reemplaza X con el número real
+                .setContentText("Llevas"+pasosTextView.getText()+" pasos hoy.")
                 .setPriority(androidx.core.app.NotificationCompat.PRIORITY_DEFAULT)
                 .setContentIntent(resultadoPendingIntent)
                 .setAutoCancel(true);
@@ -287,8 +289,10 @@ public class MainActivity extends AppCompatActivity {
         android.app.NotificationManager notificationManager = (android.app.NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         notificationManager.notify(1, builder.build());
     }
+
+    //se envia notificacion automaticamente al alcanzar el objetivo diario de pasos
     private void enviarNotificacionObjetivoAlcanzado(long pasosAlcanzados, int objetivo) {
-        crearCanalNotificacion(); // Asegúrate de que el canal esté creado
+        crearCanalNotificacion(); //Se manda a llamar el metodo para crear el canal de notificacion
 
         Intent resultadoIntent = new Intent(this, MainActivity.class);
         // Flags para asegurar que la actividad se abra correctamente
@@ -302,10 +306,10 @@ public class MainActivity extends AppCompatActivity {
                 android.app.PendingIntent.FLAG_UPDATE_CURRENT | android.app.PendingIntent.FLAG_IMMUTABLE
         );
 
-        String mensaje = "¡Felicidades! Alcanzaste tu objetivo de " + objetivo + " pasos. Llevas " + pasosAlcanzados + " pasos.";
+        String mensaje = "¡Felicidades! Alcanzaste tu objetivo diario de " + objetivo + " pasos. Sigue moviendote!!";
 
         androidx.core.app.NotificationCompat.Builder builder = new androidx.core.app.NotificationCompat.Builder(this, getPackageName())
-                .setSmallIcon(R.drawable.ic_notification) // Asegúrate de tener este icono
+                .setSmallIcon(R.drawable.logro)
                 .setContentTitle("¡Objetivo de Pasos Alcanzado!")
                 .setContentText(mensaje)
                 .setPriority(androidx.core.app.NotificationCompat.PRIORITY_HIGH) // Prioridad alta para notificaciones importantes
@@ -313,7 +317,6 @@ public class MainActivity extends AppCompatActivity {
                 .setAutoCancel(true); // La notificación se cierra al tocarla
 
         android.app.NotificationManager notificationManager = (android.app.NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-        // Usar un ID de notificación diferente para no sobrescribir otras notificaciones si es necesario
         notificationManager.notify(2, builder.build()); // ID 2 para esta notificación específica
     }
 

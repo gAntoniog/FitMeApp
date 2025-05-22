@@ -6,13 +6,17 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:padding="16dp"
+    android:background="@drawable/intro"
     tools:context=".MainActivity">
 
     <TextView
         android:id="@+id/pasos_text_view"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Pasos:0"
+        android:text="Pasos: 0"
+        android:textColor="@color/white"
+        android:textStyle="bold"
+        android:textAppearance="@mipmap/icon"
         android:textSize="24sp" />
 
     <Button
@@ -31,12 +35,18 @@
         android:id="@+id/barChartSemanal"
         android:layout_width="match_parent"
         android:layout_height="300dp"
-        android:layout_marginTop="16dp" />
+        android:layout_marginTop="16dp"
+        android:outlineSpotShadowColor="@color/white"
+        android:layout_marginBottom="16dp"
+        android:elevation="@dimen/cardview_compat_inset_shadow"/>
+
 
     <com.github.mikephil.charting.charts.LineChart
         android:id="@+id/lineChartMensual"
         android:layout_width="match_parent"
         android:layout_height="300dp"
-        android:layout_marginTop="16dp" />
+        android:layout_marginTop="16dp"
+        android:layout_marginBottom="16dp"
+        />
 
 </LinearLayout>
